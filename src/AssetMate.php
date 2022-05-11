@@ -34,11 +34,6 @@ class AssetMate extends Plugin
     // Public Properties
     // =========================================================================
 
-    /**
-     * @var string
-     */
-    public $schemaVersion = '1.0.0';
-
     // Public Methods
     // =========================================================================
 

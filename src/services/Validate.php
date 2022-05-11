@@ -25,7 +25,7 @@ class Validate extends Component
     {
         try {
             $volume = $asset->getVolume()->handle;
-        } catch (InvalidConfigException $e) {
+        } catch (InvalidConfigException) {
             return;
         }
 
@@ -33,13 +33,11 @@ class Validate extends Component
 
         if (!empty($config->extensions) && !\in_array(\strtolower($asset->getExtension()), $config->extensions, true)) {
             $asset->addError('title', Craft::t('assetmate', '{extension} is not an allowed file extension. Please upload {allowedExtensions} files only to this volume.', ['extension' => $asset->getExtension(), 'allowedExtensions' => $this->formatAllowed($config->extensions)]));
-
             return;
         }
 
         if (!empty($config->kinds) && !\in_array(\strtolower($asset->kind), $config->kinds, true)) {
             $asset->addError('title', Craft::t('assetmate', '{kind} is not an allowed file type. Please upload {allowedKinds} files only to this volume.', ['kind' => $asset->kind, 'allowedKinds' => $this->formatAllowed($config->kinds)]));
-
             return;
         }
         

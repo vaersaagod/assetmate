@@ -2,7 +2,7 @@
     "name": "vaersaagod/assetmate",
     "description": "Protect your assets, mate!",
     "type": "craft-plugin",
-    "version": "1.0.0",
+    "version": "2.0.0",
     "keywords": [
         "craft",
         "cms",
@@ -23,8 +23,8 @@
         }
     ],
     "require": {
-        "craftcms/cms": "^3.7.0",
-        "php": "^8.0"
+        "php": "^8.0.2",
+        "craftcms/cms": "^4.0.0"
     },
     "autoload": {
         "psr-4": {
@@ -34,6 +34,7 @@
     "extra": {
         "name": "AssetMate",
         "handle": "assetmate",
+        "schemaVersion": "2.0.0",
         "hasCpSettings": false,
         "hasCpSection": false,
         "changelogUrl": "https://raw.githubusercontent.com/vaersaagod/assetmate/master/CHANGELOG.md",
