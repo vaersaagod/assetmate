@@ -5,7 +5,9 @@ namespace vaersaagod\assetmate;
 use craft\base\Plugin;
 use craft\elements\Asset;
 
+use craft\events\AssetEvent;
 use vaersaagod\assetmate\models\Settings;
+use vaersaagod\assetmate\services\Resize;
 use vaersaagod\assetmate\services\Validate;
 
 use yii\base\Model;
@@ -18,6 +20,7 @@ use yii\base\Event;
  * @since     1.0.0
  *
  * @property  Validate $validate
+ * @property  Resize $resize
  * @property  Settings $settings
  */
 
@@ -51,6 +54,7 @@ class AssetMate extends Plugin
         // Register services
         $this->setComponents([
             'validate' => Validate::class,
+            'resize' => Resize::class,
         ]);
         
         Event::on(
@@ -60,6 +64,15 @@ class AssetMate extends Plugin
                 /** @var Asset $asset */
                 $asset = $event->sender;
                 $this->validate->validateAsset($asset);
+            }
+        );
+        
+        Event::on(
+            Asset::class, 
+            Asset::EVENT_BEFORE_HANDLE_FILE, 
+            function (AssetEvent $event) {
+                $asset = $event->asset;
+                $this->resize->maybeResize($asset);
             }
         );
     }
