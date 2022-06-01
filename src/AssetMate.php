@@ -58,7 +58,10 @@ class AssetMate extends Plugin
             function (ModelEvent $event) {
                 /** @var Asset $asset */
                 $asset = $event->sender;
-                $this->validate->validateAsset($asset);
+                
+                if (!$asset->propagating) {
+                    $this->validate->validateAsset($asset);
+                }
             }
         );
         
