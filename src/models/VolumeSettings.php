@@ -12,6 +12,7 @@ use craft\base\Model;
 class VolumeSettings extends Model
 {
     public array $validation = [];
+    public bool|null $convertUnmanipulable = null;
     public array $resize = [];
 
     /**
