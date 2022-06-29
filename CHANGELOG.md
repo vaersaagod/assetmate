@@ -1,5 +1,10 @@
 # AssetMate Changelog
 
+## 1.2.0 - 2022-06-29
+
+### Added
+- Added support for converting file formats on upload
+
 ## 1.1.1 - 2022-06-01
 
 ### Fixed
