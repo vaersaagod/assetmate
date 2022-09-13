@@ -29,10 +29,9 @@ and overriding settings as needed.
 use craft\elements\Asset;
 
 return [
-    'useImagerIfInstalled' => true,
-    
     'volumes' => [
         '*' => [
+            'convertUnmanipulable' => true,
             'validation' => [
                 'size' => [
                     'max' => '20M',
@@ -41,17 +40,25 @@ return [
         ],
         'images' => [
             'validation' => [
-                'kinds' => [Asset::KIND_IMAGE],
+                'extensions' => ['gif', 'jpg', 'jpeg', 'png'],
                 'size' => [
                     'max' => '2M',
-                    'min' => '1M',
                 ],
             ],
             'resize' => [
                 'maxWidth' => 2200,
                 'maxHeight' => 2200,
             ]
-        ],
+        ],        
+        'illustrations' => [
+            'validation' => [
+                'extensions' => ['svg'],
+                'size' => [
+                    'max' => '1M',
+                    'min' => '50K',
+                ],
+            ]
+        ],        
         'videos' => [
             'validation' => [
                 'extensions' => ['mp4'],
