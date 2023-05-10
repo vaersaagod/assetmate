@@ -31,7 +31,6 @@ use craft\elements\Asset;
 return [
     'volumes' => [
         '*' => [
-            'convertUnmanipulable' => true,
             'validation' => [
                 'size' => [
                     'max' => '20M',
