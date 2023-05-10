@@ -4,8 +4,12 @@ namespace vaersaagod\assetmate;
 
 use craft\base\Plugin;
 use craft\elements\Asset;
-
 use craft\events\AssetEvent;
+use craft\helpers\App;
+use craft\log\MonologTarget;
+
+use Psr\Log\LogLevel;
+
 use vaersaagod\assetmate\models\Settings;
 use vaersaagod\assetmate\services\Resize;
 use vaersaagod\assetmate\services\Validate;
@@ -45,6 +49,17 @@ class AssetMate extends Plugin
         parent::init();
 
         self::$plugin = $this;
+
+        // Custom log target
+        \Craft::getLogger()->dispatcher->targets[] = new MonologTarget([
+            'name' => 'assetmate',
+            'categories' => ['assetmate', 'vaersaagod\\assetmate\\*'],
+            'extractExceptionTrace' => !App::devMode(),
+            'allowLineBreaks' => App::devMode(),
+            'level' => App::devMode() ? LogLevel::INFO : LogLevel::WARNING,
+            'logContext' => App::devMode(),
+            'maxFiles' => 10,
+        ]);
 
         // Register services
         $this->setComponents([

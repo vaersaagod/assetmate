@@ -1,5 +1,9 @@
 # AssetMate Changelog
 
+## Unreleased
+### Changed 
+- AssetMate now logs errors and warnings to its own log target `assetmate`
+
 ## 2.1.1 - 2022-06-01
 
 ### Fixed
