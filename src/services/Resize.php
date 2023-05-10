@@ -48,7 +48,14 @@ class Resize extends Component
 
         $path = $asset->tempFilePath;
 
-        if (!$path && $asset->getScenario() === Asset::SCENARIO_MOVE) {
+        // In case the asset is being moved, there won't be a `tempFilePath` to (maybe) resize
+        // We work around this by pulling a copy of the file to a local, temporary file path
+        // We only do this if the asset is actually moved to a new volume, though.
+        if (
+            !$path &&
+            ($asset->getScenario() === Asset::SCENARIO_MOVE || $asset->getScenario() === Asset::SCENARIO_FILEOPS) &&
+            $volume->id !== $asset->volumeId
+        ) {
             try {
                 $path = $asset->getCopyOfFile();
                 $asset->tempFilePath = $path;
