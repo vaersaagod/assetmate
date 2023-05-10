@@ -1,6 +1,7 @@
 # AssetMate Changelog
 
-## Unreleased
+## 2.2.0
+
 ### Fixed
 - Fixed a PHP exception that would be thrown when uploading assets directly to Assets fields  
 ### Changed 
