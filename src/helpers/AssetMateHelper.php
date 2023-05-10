@@ -27,7 +27,7 @@ class AssetMateHelper
             if (isset($asset->newLocation)) {
                 [$folderId] = Assets::parseFileLocation($asset->newLocation);
             } else {
-                $folderId = $asset->folderId;
+                $folderId = $asset->newFolderId ?? $asset->folderId;
             }
             if (!$folderId) {
                 return null;

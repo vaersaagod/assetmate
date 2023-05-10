@@ -5,6 +5,7 @@ namespace vaersaagod\assetmate\services;
 use craft\base\Component;
 use craft\elements\Asset;
 use craft\errors\ImageException;
+use craft\errors\VolumeException;
 use craft\helpers\Image;
 use craft\models\Volume;
 
@@ -13,6 +14,7 @@ use vaersaagod\assetmate\helpers\AssetMateHelper;
 use vaersaagod\assetmate\models\ResizeSettings;
 use vaersaagod\assetmate\models\Settings;
 use vaersaagod\assetmate\models\VolumeSettings;
+use yii\base\InvalidConfigException;
 
 /**
  * Resize Service
@@ -30,11 +32,6 @@ class Resize extends Component
      */
     public function maybeResize(Asset $asset): void
     {
-        $path = $asset->tempFilePath;
-
-        if (!$path) {
-            return;
-        }
 
         $volume = AssetMateHelper::getAssetVolume($asset);
 
@@ -48,6 +45,21 @@ class Resize extends Component
             return;
         }
 
+        $path = $asset->tempFilePath;
+
+        if (!$path && $asset->getScenario() === Asset::SCENARIO_MOVE) {
+            try {
+                $path = $asset->getCopyOfFile();
+                $asset->tempFilePath = $path;
+            } catch (VolumeException|InvalidConfigException) {
+                return;
+            }
+        }
+
+        if (!$path) {
+            return;
+        }
+
         $this->resize($asset, $config);
     }
 
@@ -58,7 +70,7 @@ class Resize extends Component
      */
     public function resize(Asset $asset, ResizeSettings $config): void
     {
-        $filename = $asset->filename;
+
         $path = $asset->tempFilePath;
 
         // Is this a manipulatable image?
@@ -68,12 +80,6 @@ class Resize extends Component
 
         try {
             $image = \Craft::$app->images->loadImage($path);
-
-            $original = [
-                'width' => $image->getWidth(),
-                'height' => $image->getHeight(),
-                'size' => filesize($path),
-            ];
 
             if (
                 (isset($config->maxWidth) && !isset($config->maxHeight) && $image->getWidth() < $config->maxWidth) ||
