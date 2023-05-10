@@ -14,6 +14,7 @@ use vaersaagod\assetmate\helpers\AssetMateHelper;
 use vaersaagod\assetmate\models\ResizeSettings;
 use vaersaagod\assetmate\models\Settings;
 use vaersaagod\assetmate\models\VolumeSettings;
+
 use yii\base\InvalidConfigException;
 
 /**

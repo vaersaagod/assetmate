@@ -5,7 +5,8 @@
 - Fixed a PHP exception that would be thrown when uploading assets directly to Assets fields  
 ### Changed 
 - AssetMate now logs errors and warnings to its own log target `assetmate`
-- AssetMate now resizes assets when moving them between volumes, if the target volume has a `maxWidth` and `maxHeight` set in its resize rules  
+- AssetMate now resizes assets when moving them between volumes, if the target volume has a `maxWidth` and `maxHeight` set in its resize rules
+- AssetMate now requires Craft 4.3.11 or later 
 ### Added
 - Added `AssetMateHelper`  
 
