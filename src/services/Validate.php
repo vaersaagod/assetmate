@@ -6,11 +6,13 @@ use Craft;
 use craft\base\Component;
 use craft\elements\Asset;
 use craft\helpers\ConfigHelper;
+use craft\models\Volume;
+
 use vaersaagod\assetmate\AssetMate;
+use vaersaagod\assetmate\helpers\AssetMateHelper;
 use vaersaagod\assetmate\models\Settings;
 use vaersaagod\assetmate\models\ValidationSettings;
 use vaersaagod\assetmate\models\VolumeSettings;
-use yii\base\InvalidConfigException;
 
 /**
  * Validate Service
@@ -23,9 +25,10 @@ class Validate extends Component
 {
     public function validateAsset(Asset $asset): void
     {
-        try {
-            $volume = $asset->getVolume()->handle;
-        } catch (InvalidConfigException) {
+
+        $volume = AssetMateHelper::getAssetVolume($asset);
+
+        if (!$volume) {
             return;
         }
 
@@ -61,14 +64,21 @@ class Validate extends Component
                 }
             }
 
-            return;
         }
-        
         
     }
 
-    public function getValidateConfig(string $volume): ValidationSettings
+    /**
+     * @param string|Volume $volume Volume model or handle
+     * @return ValidationSettings
+     */
+    public function getValidateConfig(string|Volume $volume): ValidationSettings
     {
+
+        if ($volume instanceof Volume) {
+            $volume = $volume->handle;
+        }
+
         /** @var Settings $config */
         $config = AssetMate::$plugin->getSettings();
         $volumes = $config->volumes;

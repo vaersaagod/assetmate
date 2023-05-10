@@ -6,11 +6,13 @@ use craft\base\Component;
 use craft\elements\Asset;
 use craft\errors\ImageException;
 use craft\helpers\Image;
+use craft\models\Volume;
+
 use vaersaagod\assetmate\AssetMate;
+use vaersaagod\assetmate\helpers\AssetMateHelper;
 use vaersaagod\assetmate\models\ResizeSettings;
 use vaersaagod\assetmate\models\Settings;
 use vaersaagod\assetmate\models\VolumeSettings;
-use yii\base\InvalidConfigException;
 
 /**
  * Resize Service
@@ -21,6 +23,11 @@ use yii\base\InvalidConfigException;
  */
 class Resize extends Component
 {
+
+    /**
+     * @param Asset $asset
+     * @return void
+     */
     public function maybeResize(Asset $asset): void
     {
         $path = $asset->tempFilePath;
@@ -29,9 +36,9 @@ class Resize extends Component
             return;
         }
 
-        try {
-            $volume = $asset->getVolume()->handle;
-        } catch (InvalidConfigException) {
+        $volume = AssetMateHelper::getAssetVolume($asset);
+
+        if (!$volume) {
             return;
         }
 
@@ -44,6 +51,11 @@ class Resize extends Component
         $this->resize($asset, $config);
     }
 
+    /**
+     * @param Asset $asset
+     * @param ResizeSettings $config
+     * @return void
+     */
     public function resize(Asset $asset, ResizeSettings $config): void
     {
         $filename = $asset->filename;
@@ -146,8 +158,17 @@ class Resize extends Component
         }
     }
 
-    public function getResizeConfig(string $volume): ResizeSettings
+    /**
+     * @param string|Volume $volume Volume model or handle
+     * @return ResizeSettings
+     */
+    public function getResizeConfig(string|Volume $volume): ResizeSettings
     {
+
+        if ($volume instanceof Volume) {
+            $volume = $volume->handle;
+        }
+
         /** @var Settings $config */
         $config = AssetMate::$plugin->getSettings();
         $volumes = $config->volumes;

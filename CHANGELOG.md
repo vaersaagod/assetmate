@@ -1,8 +1,12 @@
 # AssetMate Changelog
 
 ## Unreleased
+### Fixed
+- Fixed a PHP exception that would be thrown when uploading assets directly to Assets fields  
 ### Changed 
 - AssetMate now logs errors and warnings to its own log target `assetmate`
+### Added
+- Added `AssetMateHelper`  
 
 ## 2.1.1 - 2022-06-01
 
