@@ -57,7 +57,7 @@ class AssetMate extends Plugin
             'extractExceptionTrace' => !App::devMode(),
             'allowLineBreaks' => App::devMode(),
             'level' => App::devMode() ? LogLevel::INFO : LogLevel::WARNING,
-            'logContext' => App::devMode(),
+            'logContext' => false,
             'maxFiles' => 10,
         ]);
 
