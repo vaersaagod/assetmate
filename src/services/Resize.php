@@ -92,7 +92,7 @@ class Resize extends Component
             $image->resize($dimensions[0], $dimensions[1]);
             
             if (method_exists($image, 'setQuality')) {
-                $image->setQuality($this->getImageQuality($path));
+                $image->setQuality($this->getImageQuality($path, $config));
             }
             
             $this->save($image, $path);
@@ -160,14 +160,14 @@ class Resize extends Component
         return new ResizeSettings($r);
     }
 
-    public function getImageQuality($path): int
+    public function getImageQuality($path, ResizeSettings $config): int
     {
-        // tbd : maybe add to config at a later point
+        // tbd : maybe improve config (per format) at some point
         
         if (@pathinfo($path, PATHINFO_EXTENSION) === 'png') {
             return 2;
         }
         
-        return 100;
+        return $config->quality;
     }
 }

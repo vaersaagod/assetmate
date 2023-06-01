@@ -13,6 +13,7 @@ class ResizeSettings extends Model
 {
     public ?int $maxWidth = null;
     public ?int $maxHeight = null;
+    public int $quality = 95;
 
     // Public Methods
     // =========================================================================
