@@ -1,5 +1,10 @@
 # AssetMate Changelog
 
+## 1.2.1 - 2023-06-01
+
+### Added
+- Added support for setting quality per resize config
+
 ## 1.2.0 - 2022-06-29
 
 ### Added
