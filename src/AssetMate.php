@@ -11,6 +11,7 @@ use craft\log\MonologTarget;
 use Psr\Log\LogLevel;
 
 use vaersaagod\assetmate\models\Settings;
+use vaersaagod\assetmate\services\Convert;
 use vaersaagod\assetmate\services\Resize;
 use vaersaagod\assetmate\services\Validate;
 
@@ -23,9 +24,10 @@ use yii\base\Event;
  * @package   AssetMate
  * @since     1.0.0
  *
- * @property  Validate $validate
- * @property  Resize $resize
- * @property  Settings $settings
+ * @property  Validate     $validate
+ * @property  Resize       $resize
+ * @property  Convert      $convert
+ * @property  Settings     $settings
  */
 
 class AssetMate extends Plugin
@@ -65,6 +67,7 @@ class AssetMate extends Plugin
         $this->setComponents([
             'validate' => Validate::class,
             'resize' => Resize::class,
+            'convert' => Convert::class,
         ]);
         
         Event::on(
@@ -84,6 +87,7 @@ class AssetMate extends Plugin
             Asset::EVENT_BEFORE_HANDLE_FILE, 
             function (AssetEvent $event) {
                 $asset = $event->asset;
+                $this->convert->maybeConvert($asset);
                 $this->resize->maybeResize($asset);
             }
         );

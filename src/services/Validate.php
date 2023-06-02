@@ -33,9 +33,10 @@ class Validate extends Component
         }
 
         $config = $this->getValidateConfig($volume);
+        $extension = pathinfo(($asset->newFilename ?? $asset->filename), PATHINFO_EXTENSION);
 
-        if (!empty($config->extensions) && !\in_array(\strtolower($asset->getExtension()), $config->extensions, true)) {
-            $asset->addError('title', Craft::t('assetmate', '{extension} is not an allowed file extension. Please upload {allowedExtensions} files only to this volume.', ['extension' => $asset->getExtension(), 'allowedExtensions' => $this->formatAllowed($config->extensions)]));
+        if (!empty($config->extensions) && !\in_array(\strtolower($extension), $config->extensions, true)) {
+            $asset->addError('title', Craft::t('assetmate', '{extension} is not an allowed file extension. Please upload {allowedExtensions} files only to this volume.', ['extension' => $extension, 'allowedExtensions' => $this->formatAllowed($config->extensions)]));
             return;
         }
 

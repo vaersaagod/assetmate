@@ -13,6 +13,7 @@ class VolumeSettings extends Model
 {
     public array $validation = [];
     public array $resize = [];
+    public bool|null $convertUnmanipulable = null;
 
     /**
      * @return array
