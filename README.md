@@ -47,7 +47,9 @@ return [
             'resize' => [
                 'maxWidth' => 2200,
                 'maxHeight' => 2200,
-            ]
+                'quality' => 90,
+            ],
+            'convertUnmanipulable' => true,
         ],        
         'illustrations' => [
             'validation' => [

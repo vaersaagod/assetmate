@@ -1,5 +1,11 @@
 # AssetMate Changelog
 
+## 2.3.0 - 2023-06-02
+
+### Added
+- Added support for setting quality per resize config
+- Added support for converting file formats on upload
+
 ## 2.2.0 - 2023-05-10
 
 ### Fixed
