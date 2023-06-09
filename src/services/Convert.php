@@ -79,8 +79,8 @@ class Convert extends Component
         $config = AssetMate::$plugin->getSettings();
         $volumes = $config->volumes;
 
-        $defaultConfig = new VolumeSettings($volumes['*'] ?? null);
-        $volumeConfig = new VolumeSettings($volumes[$volume] ?? null);
+        $defaultConfig = new VolumeSettings($volumes['*'] ?? []);
+        $volumeConfig = new VolumeSettings($volumes[$volume] ?? []);
 
         return $volumeConfig->convertUnmanipulable ?? $defaultConfig->convertUnmanipulable ?? false;
     }
