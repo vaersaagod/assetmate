@@ -1,5 +1,9 @@
 # AssetMate Changelog
 
+## 2.3.2 - 2023-09-28
+### Fixed
+- Fixed an issue where AssetMate could cause a type related PHP exception for assets without a volume (temporary files)  
+
 ## 2.3.1 - 2023-06-10
 ### Fixed
 - Fixed an issue where AssetMate could cause a type related PHP exception when uploading files  
