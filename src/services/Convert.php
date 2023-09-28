@@ -28,8 +28,12 @@ class Convert extends Component
         }
 
         try {
-            $volume = $asset->getVolume()->handle;
+            $volume = $asset?->getVolume()->handle;
         } catch (InvalidConfigException) {
+            return;
+        }
+        
+        if ($volume === null) {
             return;
         }
 
