@@ -16,7 +16,6 @@ use craft\helpers\ElementHelper;
 use craft\helpers\Json;
 use craft\models\Volume;
 
-use craft\models\VolumeFolder;
 use verbb\supertable\fields\SuperTableField;
 
 use yii\console\ExitCode;
@@ -29,9 +28,9 @@ class PurgeController extends Controller
 {
 
     /** @var string */
-    public $defaultAction = 'index';
+    public $defaultAction = 'assets';
 
-    /** @var string Set to a volume handle to only purge unused assets from that volume */
+    /** @var string Set to a volume handle to only purge unused assets and/or delete empty folders in that volume */
     public string $volume = '*';
 
     /** @var string Set to a valid file kind (e.g. "image" or "video") to only purge unused assets with that kind */
@@ -43,8 +42,8 @@ class PurgeController extends Controller
     /** @var bool Whether to search content tables for non-relation asset uses (e.g. reference tags in rich text fields). Takes a long time if there are a lot of assets and/or content. */
     public bool $searchContentTables = true;
 
-    /** @var bool Whether to delete folders for purged assets, if they are empty after purging. */
-    public bool $deleteFolders = true;
+    /** @var bool Whether to automatically purge empty folders after purging unused assets. */
+    public bool $purgeEmptyFolders = true;
 
     /** @var array */
     private array $_textColumnsByTable;
@@ -53,36 +52,42 @@ class PurgeController extends Controller
     {
         $options = parent::options($actionID);
         switch ($actionID) {
-            case 'index':
+            case 'assets':
                 $options[] = 'volume';
                 $options[] = 'kind';
                 $options[] = 'lastUpdatedBefore';
                 $options[] = 'searchContentTables';
-                $options[] = 'deleteFolders';
+                $options[] = 'purgeEmptyFolders';
+                break;
+            case 'folders':
+                $options[] = 'volume';
                 break;
         }
         return $options;
     }
 
     /**
-     * Purges unused assets. An "unused" asset is an asset that has no relations to other elements, and is not referenced in content text columns via reference tags.
+     * Purges unused assets. An "unused" asset is an asset that is not the target of any element relations, and is not referenced in content table text columns (e.g. in reference tags etc).
      *
      * assetmate/purge command
      */
-    public function actionIndex(): int
+    public function actionAssets(): int
     {
 
         $then = time();
 
         $query = (new Query())
             ->select('assets.id')
-            ->from(Table::ASSETS . ' AS assets');
+            ->from(Table::ASSETS . ' AS assets')
+            ->innerJoin(Table::ELEMENTS . ' AS elements', 'assets.id = elements.id AND elements.dateDeleted IS NULL') // Excluding assets that are already soft-deleted
+            ->where(['NOT EXISTS', (new Query())
+                ->from(Table::USERS . ' AS users')
+                ->where('assets.id = users.photoId')
+            ]);
 
         if ($this->volume !== '*') {
-            $volume = Craft::$app->getVolumes()->getVolumeByHandle($this->volume);
+            $volume = $this->_getVolumeFromHandle($this->volume);
             if (!$volume) {
-                $allVolumes = array_map(static fn (Volume $volume) => $volume->handle, Craft::$app->getVolumes()->getAllVolumes());
-                $this->stderr("Volume \"$this->volume\" does not exist. Valid volumes are \n" . implode("\n", $allVolumes) . PHP_EOL, BaseConsole::FG_RED);
                 return ExitCode::UNSPECIFIED_ERROR;
             }
 
@@ -117,7 +122,8 @@ class PurgeController extends Controller
         $totalAssetsCount = $query->count();
 
         $this->stdout(PHP_EOL);
-        $this->stdout("Evaluating {$totalAssetsCount} total assets... 🚀" . PHP_EOL, BaseConsole::FG_CYAN);
+        $this->stdout("Evaluating {$totalAssetsCount} total assets...\n", BaseConsole::FG_CYAN);
+        $this->stdout(PHP_EOL);
 
         $query
             ->andWhere(['NOT IN', 'assets.id', (new Query())
@@ -132,7 +138,7 @@ class PurgeController extends Controller
             return ExitCode::OK;
         }
 
-        $this->stdout("Found {$assetsWithoutRelationsCount} assets without a target record in the element relations table.\n", BaseConsole::FG_PURPLE);
+        $this->stdout("Found {$assetsWithoutRelationsCount} assets that aren't targeted in any element relations.\n", BaseConsole::FG_PURPLE);
 
         if ($this->searchContentTables) {
 
@@ -203,6 +209,11 @@ class PurgeController extends Controller
 
                 BaseConsole::endProgress(true);
 
+                $time = time() - $then;
+                $this->stdout(PHP_EOL);
+                $this->stdout("Done ({$time}s)! 🎉" . PHP_EOL, BaseConsole::FG_PURPLE);
+                $this->stdout(PHP_EOL);
+
                 $countReferenceTags = count($contentTableAssetIds);
                 if ($countReferenceTags) {
                     $this->stdout("Found $countReferenceTags assets referenced in content tables; these will not be purged.\n", BaseConsole::FG_PURPLE);
@@ -226,9 +237,6 @@ class PurgeController extends Controller
 
         }
 
-        $time = time() - $then;
-        $this->stdout(PHP_EOL);
-        $this->stdout("Done ({$time}s)! 🎉" . PHP_EOL, BaseConsole::FG_PURPLE);
         $this->stdout(PHP_EOL);
 
         $unusedAssetsCount = $query->count();
@@ -249,17 +257,9 @@ class PurgeController extends Controller
         if ($this->interactive && !$this->confirm("Delete {$unusedAssetsCount} assets? Both the files and their asset records will permanently deleted 🔥" . PHP_EOL)) {
             $this->stdout(PHP_EOL);
             $this->stdout("OK, no harm done!\n", BaseConsole::FG_YELLOW);
+
         } else {
             $this->stdout(PHP_EOL);
-
-            if ($this->deleteFolders) {
-                $folderIds = (clone $query)
-                    ->select('assets.folderId')
-                    ->distinct()
-                    ->column();
-            } else {
-                $folderIds = [];
-            }
 
             $then = time();
 
@@ -285,21 +285,126 @@ class PurgeController extends Controller
 
             BaseConsole::endProgress(true);
 
-            if (!empty($folderIds)) {
-                $this->stdout(PHP_EOL);
-                $this->stdout("Deleting empty folders...\n");
-                foreach ($folderIds as $folderId) {
-                    $this->_maybeDeleteFolder($folderId);
-                }
-            }
-
             $time = time() - $then;
             $this->stdout("Done ({$time}s)! 🎉" . PHP_EOL, BaseConsole::FG_PURPLE);
             $this->stdout(PHP_EOL);
             $this->stdout("$numDeleted of $unusedAssetsCount assets were deleted.\n", BaseConsole::FG_PURPLE);
             $this->stdout("There were $numErrors errors.\n", BaseConsole::FG_PURPLE);
 
+            // Purge empty folders?
+            if ($this->purgeEmptyFolders) {
+                $this->stdout(PHP_EOL);
+                $this->stdout("Searching for empty folders to purge...\n", BaseConsole::FG_YELLOW);
+                $this->interactive = false;
+                if ($this->actionFolders() === ExitCode::OK) {
+                    $this->stdout("Done! 🎉" . PHP_EOL, BaseConsole::FG_PURPLE);
+                } else {
+                    $this->stderr("Failed to purge empty folders\n", BaseConsole::FG_RED);
+                }
+            }
+
         }
+
+        return ExitCode::OK;
+    }
+
+    /**
+     * Purges empty folders.
+     *
+     * assetmate/folders command
+     */
+    public function actionFolders(): int
+    {
+
+        $query = (new Query())
+            ->select(['folders.id', 'folders.parentId'])
+            ->from(Table::VOLUMEFOLDERS . ' AS folders')
+            ->where(['!=', 'folders.parentId', 'NULL']) // Folders without parent IDs are root folders
+            ->andWhere(['!=', 'folders.path', 'NULL']); // Folders without paths could be root folder, temporary uploads, user photos
+
+        if ($this->volume != '*') {
+            $volume = $this->_getVolumeFromHandle($this->volume);
+            if (!$volume) {
+                return ExitCode::UNSPECIFIED_ERROR;
+            }
+            $query
+                ->andWhere('folders.volumeId = :volumeId', [
+                    ':volumeId' => $volume->id,
+                ]);
+        } else {
+            $query
+                ->andWhere(['!=', 'folders.volumeId', 'NULL']); // Folders without a volume ID is typically user photos
+        }
+
+        $query
+            ->andWhere(['NOT EXISTS', (new Query())
+                ->from(Table::ASSETS . ' AS assets')
+                ->where('folders.id = assets.folderId')
+            ]);
+
+        $totalFoldersCount = $query->count();
+
+        $i = 0;
+        BaseConsole::startProgress(0, $totalFoldersCount);
+
+        $foldersToDeleteIds = [];
+        foreach ($query->each() as ['id' => $folderId]) {
+            $isEmpty = !Asset::find()
+                ->folderId($folderId)
+                ->status(null)
+                ->includeSubfolders()
+                ->exists();
+            if ($isEmpty) {
+                $foldersToDeleteIds[] = $folderId;
+            }
+            $i++;
+            BaseConsole::updateProgress($i, $totalFoldersCount, 'Scanning for empty folders...');
+        }
+
+        BaseConsole::endProgress(true);
+
+        $totalFoldersCount = count($foldersToDeleteIds);
+
+        if (!$totalFoldersCount) {
+            $this->stdout("No empty folders found.\n", BaseConsole::FG_PURPLE);
+            return ExitCode::OK;
+        }
+
+        $this->stdout(PHP_EOL);
+
+        if ($this->interactive && !$this->confirm("Proceed to delete $totalFoldersCount empty folders? This action cannot be undone 🔥")) {
+            $this->stdout(PHP_EOL);
+            $this->stdout("OK, your folders live to see another day.\n", BaseConsole::FG_PURPLE);
+            return ExitCode::OK;
+        }
+
+        $i = 0;
+        BaseConsole::startProgress(0, $totalFoldersCount);
+
+        $numDeleted = 0;
+        $numErrors = 0;
+        foreach ($foldersToDeleteIds as $folderId) {
+            if (!Craft::$app->getAssets()->getFolderById($folderId)) {
+                $numDeleted++;
+            } else {
+                try {
+                    Craft::$app->getAssets()->deleteFoldersByIds([$folderId]);
+                    $numDeleted++;
+                } catch (\Throwable $e) {
+                    Craft::error($e, __METHOD__);
+                    $numErrors++;
+                }
+            }
+            $i++;
+            BaseConsole::updateProgress($i, $totalFoldersCount, 'Deleting folders...');
+        }
+
+        BaseConsole::endProgress(true);
+
+        $this->stdout("Done! 🎉" . PHP_EOL, BaseConsole::FG_PURPLE);
+        $this->stdout(PHP_EOL);
+
+        $this->stdout("$numDeleted empty folders were deleted.\n", BaseConsole::FG_PURPLE);
 
         return ExitCode::OK;
     }
@@ -399,8 +504,7 @@ class PurgeController extends Controller
      */
     private function _maybeDeleteFolder(int $folderId): void
     {
-        $folder = Craft::$app->getAssets()->getFolderById($folderId);
-        if (!$folder) { // Folder not found
+        if (!$folder = Craft::$app->getAssets()->getFolderById($folderId)) { // Folder doesn't exist
             return;
         }
         if (!$folder->parentId) { // This is a root folder. Deleting it would be bad.
@@ -408,6 +512,7 @@ class PurgeController extends Controller
         }
         $isEmpty = !Asset::find()
             ->folderId($folder->id)
+            ->status(null)
             ->includeSubfolders()
             ->exists();
         if (!$isEmpty) { // This folder is not empty
@@ -418,6 +523,20 @@ class PurgeController extends Controller
         } catch (\Throwable $e) {
             Craft::error($e, __METHOD__);
         }
+    }
+
+    /**
+     * @param string $handle
+     * @return Volume|null
+     */
+    private function _getVolumeFromHandle(string $handle): ?Volume
+    {
+        if (!$volume = Craft::$app->getVolumes()->getVolumeByHandle($handle)) {
+            $allVolumes = array_map(static fn (Volume $volume) => $volume->handle, Craft::$app->getVolumes()->getAllVolumes());
+            $this->stderr("Volume \"$handle\" does not exist. Valid volumes are \n" . implode("\n", $allVolumes) . PHP_EOL, BaseConsole::FG_RED);
+            return null;
+        }
+        return $volume;
     }
 
 }

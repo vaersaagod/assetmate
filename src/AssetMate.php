@@ -2,9 +2,11 @@
 
 namespace vaersaagod\assetmate;
 
+use craft\base\Element;
 use craft\base\Plugin;
 use craft\elements\Asset;
 use craft\events\AssetEvent;
+use craft\events\DefineHtmlEvent;
 use craft\helpers\App;
 use craft\log\MonologTarget;
 
@@ -91,6 +93,15 @@ class AssetMate extends Plugin
                 $this->resize->maybeResize($asset);
             }
         );
+
+//        Event::on(
+//            Asset::class,
+//            Element::EVENT_DEFINE_META_FIELDS_HTML,
+//            static function (DefineHtmlEvent $event) {
+//                $event->html .= '<div>Hei</div>';
+//            }
+//        );
+
     }
 
     // Protected Methods
