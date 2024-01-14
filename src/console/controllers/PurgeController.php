@@ -3,20 +3,17 @@
 namespace vaersaagod\assetmate\console\controllers;
 
 use Craft;
-use craft\base\FieldInterface;
 use craft\console\Controller;
 use craft\db\Query;
 use craft\db\Table;
 use craft\elements\Asset;
-use craft\fields\Matrix;
 use craft\helpers\Assets;
 use craft\helpers\ConfigHelper;
 use craft\helpers\Db;
-use craft\helpers\ElementHelper;
 use craft\helpers\Json;
 use craft\models\Volume;
 
-use verbb\supertable\fields\SuperTableField;
+use vaersaagod\assetmate\helpers\ContentTablesHelper;
 
 use yii\console\ExitCode;
 use yii\helpers\BaseConsole;
@@ -44,9 +41,6 @@ class PurgeController extends Controller
 
     /** @var bool Whether to automatically purge empty folders after purging unused assets. */
     public bool $purgeEmptyFolders = true;
-
-    /** @var array */
-    private array $_textColumnsByTable;
 
     public function options($actionID): array
     {
@@ -146,26 +140,7 @@ class PurgeController extends Controller
             $this->stdout("Searching for asset references in content tables... 🔍" . PHP_EOL, BaseConsole::FG_YELLOW);
 
             $contentTableAssetIds = [];
-
-            // Get all textual field columns and search them for reference tags
-            foreach (Craft::$app->getFields()->getAllFields() as $field) {
-                $this->_addTextColumnsForField($field);
-            }
-
-            // Exclude content tables with no rows
-            $contentTablesToSearch = [];
-            foreach ($this->_textColumnsByTable as $table => $columns) {
-                $rowCount = (new Query())
-                    ->from($table)
-                    ->count();
-                if (!$rowCount) {
-                    continue;
-                }
-                $contentTablesToSearch[$table] = [
-                    'columns' => $columns,
-                    'count' => $rowCount,
-                ];
-            }
+            $contentTablesToSearch = ContentTablesHelper::getTextColumnsByTable();
 
             if (!empty(array_keys($contentTablesToSearch))) {
 
@@ -405,6 +380,7 @@ class PurgeController extends Controller
         $this->stdout(PHP_EOL);
 
         $this->stdout("$numDeleted empty folders were deleted.\n", BaseConsole::FG_PURPLE);
+        $this->stdout("There were $numErrors errors.\n", BaseConsole::FG_PURPLE);
 
         return ExitCode::OK;
     }
@@ -434,60 +410,6 @@ class PurgeController extends Controller
         return array_unique($assetIds);
     }
 
-    private function _addTextColumnsForField(FieldInterface $field): void
-    {
-        if ($field instanceof Matrix) {
-            $this->_addTextColumnsForMatrixField($field);
-        } else if ($field instanceof SuperTableField) {
-            $this->_addTextColumnsForSuperTableField($field);
-        } else {
-            $this->_addTextColumnsForContentTableField($field);
-        }
-    }
-
-    private function _addTextColumnsForMatrixField(Matrix $matrixField): void
-    {
-        $blockTypes = Craft::$app->getMatrix()->getBlockTypesByFieldId($matrixField->id);
-
-        foreach ($blockTypes as $blockType) {
-            $fieldColumnPrefix = 'field_' . $blockType->handle . '_';
-
-            foreach ($blockType->getCustomFields() as $field) {
-                $this->_addTextColumnsForContentTableField($field, $matrixField->contentTable, $fieldColumnPrefix);
-            }
-        }
-    }
-
-    private function _addTextColumnsForSuperTableField(SuperTableField $superTableField): void
-    {
-        $fields = $superTableField->getBlockTypeFields();
-
-        foreach ($fields as $field) {
-            $this->_addTextColumnsForContentTableField($field, $superTableField->contentTable);
-        }
-    }
-
-    private function _addTextColumnsForContentTableField(FieldInterface $field, string $table = Table::CONTENT, string $fieldColumnPrefix = 'field_'): void
-    {
-        if (!$field::hasContentColumn()) {
-            return;
-        }
-
-        $columnType = $field->getContentColumnType();
-
-        if (is_array($columnType)) {
-            foreach (array_keys($columnType) as $i => $key) {
-                if (Db::isTextualColumnType($columnType[$key])) {
-                    $column = ElementHelper::fieldColumn($fieldColumnPrefix, $field->handle, $field->columnSuffix, $i !== 0 ? $key : null);
-                    $this->_textColumnsByTable[$table][] = $column;
-                }
-            }
-        } elseif (Db::isTextualColumnType($columnType)) {
-            $column = ElementHelper::fieldColumn($fieldColumnPrefix, $field->handle, $field->columnSuffix);
-            $this->_textColumnsByTable[$table][] = $column;
-        }
-    }
-
     /**
      * @param int $id
      * @return bool
@@ -496,33 +418,6 @@ class PurgeController extends Controller
     private function _deleteAsset(int $id): bool
     {
         return Craft::$app->getElements()->deleteElementById($id, Asset::class, null, true);
-    }
-
-    /**
-     * @param int $folderId
-     * @return void
-     */
-    private function _maybeDeleteFolder(int $folderId): void
-    {
-        if (!$folder = Craft::$app->getAssets()->getFolderById($folderId)) { // Folder doesn't exist
-            return;
-        }
-        if (!$folder->parentId) { // This is a root folder. Deleting it would be bad.
-            return;
-        }
-        $isEmpty = !Asset::find()
-            ->folderId($folder->id)
-            ->status(null)
-            ->includeSubfolders()
-            ->exists();
-        if (!$isEmpty) { // This folder is not empty
-            return;
-        }
-        try {
-            Craft::$app->getAssets()->deleteFoldersByIds($folder->id);
-        } catch (\Throwable $e) {
-            Craft::error($e, __METHOD__);
-        }
     }
 
     /**

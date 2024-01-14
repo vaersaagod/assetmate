@@ -2,7 +2,8 @@
 
 ## Unreleased
 ### Added
-- Added the `assetsmate/purge` CLI command for bulk-deleting unused assets  
+- Added the `assetsmate/purge` CLI command for bulk-deleting unused assets
+- Added the `assetsmate/purge/folders` CLI command for bulk-deleting empty folders
 
 ## 2.3.2 - 2023-09-28
 ### Fixed
