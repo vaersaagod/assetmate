@@ -104,7 +104,7 @@ class PurgeController extends Controller
                 ]);
         }
 
-        if ($this->lastUpdatedBefore) {
+        if ($this->lastUpdatedBefore !== false) {
             $lastUpdatedBeforeSeconds = ConfigHelper::durationInSeconds($this->lastUpdatedBefore);
             $lastUpdatedBeforeDateTime = (new \DateTime())->modify("-$lastUpdatedBeforeSeconds seconds");
             $query
