@@ -158,7 +158,7 @@ class PurgeController extends Controller
                     if (empty($assetIds)) {
                         continue;
                     }
-                    $referenceTagPattern = implode('|', array_map(static fn(int $assetId) => "\{asset:$assetId:", $assetIds));
+                    $referenceTagPattern = implode('|', array_map(static fn(int $assetId) => "asset:$assetId:url", $assetIds));
                     $implodedAssetIdsArray = "'" . implode("','", $assetIds) . "'";
                     foreach ($contentTablesToSearch as $table => ['columns' => $columns]) {
                         $referenceTagsQuery = (new Query())
