@@ -95,16 +95,6 @@ class AssetMate extends Plugin
             }
         );
 
-        Event::on(
-            Asset::class,
-            Element::EVENT_DEFINE_SIDEBAR_HTML,
-            static function (DefineHtmlEvent $event) {
-                /** @var Asset $asset */
-                $asset = $event->sender;
-                $event->html .= CpHelper::renderAssetMetaDataHtml($asset);
-            }
-        );
-
     }
 
     // Protected Methods
