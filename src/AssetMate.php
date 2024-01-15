@@ -2,14 +2,17 @@
 
 namespace vaersaagod\assetmate;
 
+use craft\base\Element;
 use craft\base\Plugin;
 use craft\elements\Asset;
 use craft\events\AssetEvent;
+use craft\events\DefineHtmlEvent;
 use craft\helpers\App;
 use craft\log\MonologTarget;
 
 use Psr\Log\LogLevel;
 
+use vaersaagod\assetmate\helpers\CpHelper;
 use vaersaagod\assetmate\models\Settings;
 use vaersaagod\assetmate\services\Convert;
 use vaersaagod\assetmate\services\Resize;
@@ -91,6 +94,7 @@ class AssetMate extends Plugin
                 $this->resize->maybeResize($asset);
             }
         );
+
     }
 
     // Protected Methods

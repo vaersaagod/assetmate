@@ -1,5 +1,10 @@
 # AssetMate Changelog
 
+## 2.4.0 - 2024-01-15
+### Added
+- Added the `assetmate/purge` CLI command for bulk-deleting unused assets
+- Added the `assetmate/purge/folders` CLI command for bulk-deleting empty folders
+
 ## 2.3.2 - 2023-09-28
 ### Fixed
 - Fixed an issue where AssetMate could cause a type related PHP exception for assets without a volume (temporary files)  
