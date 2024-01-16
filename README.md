@@ -78,7 +78,7 @@ AssetMate adds a couple of asset-related CLI utility commands:
 
 ### Purging "unused" assets  
 
-An "unused" asset is an asset that isn't a *target* in any element relations, and that is not found in any reference tags in the database content tables.  
+An "unused" asset is an asset that isn't a *target* in any element relations (i.e. has no source relations), and is also not found in any reference tags in database content tables (meaning it's not linked to or used in Redactor/CKEditor/LinkMate fields).    
 
 To delete all unused assets:  
 
@@ -96,10 +96,13 @@ Only purge assets with a specific file kind, e.g. `php craft assetmate/purge --k
 By default, AssetMate will not purge assets with a `dateUpdated` timestamp later than 30 days ago. This option can be set to an integer (i.e. number of seconds), a valid PHP date interval string, or `false` to disable the `dateUpdated` check entirely.  
 
 ##### `--searchContentTables` (bool, default `true`)  
-In addition to checking the `relations` table, AssetMate will search content tables for non-relation asset uses (e.g. reference tags in rich text fields). This can take a long time if there are a lot of assets and/or content; set this option to `false` to bypass content table searching.  
+In addition to checking the `relations` table for assets without any source element relations, AssetMate will search content tables to make sure that the assets found aren't referenced in text columns (e.g. in reference tags in Redactor or CK Editor). This can take a long time if there are a lot of assets and/or content, so if you're confident that you have no asset references in text fields, set this option to `false` to bypass content table searching altogether.  
 
-##### `--purgeEmptyFolders` (bool, default `true`)  
-If `true`, AssetMate will automatically purge empty folders after purging unused assets (if the `--volume` option is used, only empty folders in that volume will be deleted).  
+#### `--searchContentTablesBatchSize` (int, default `500`)  
+After querying for assets without any source element relations, AssetMate will search for these assets across text columns in content tables. To speed up this lengthy process, the IDs are batched. If you're running into a PDO exception "Timeout exceeded in regular expression match", consider setting the batch size to a lower value.  
+
+##### `--deleteEmptyFolders` (bool, default `true`)  
+If `true`, AssetMate will scan for and delete any empty folders after purging unused assets. If the `--volume` option is used, only empty folders in that volume will be deleted.    
 
 ### Purging empty folders  
 

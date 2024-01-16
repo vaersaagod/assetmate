@@ -15,6 +15,8 @@ use craft\models\Volume;
 
 use vaersaagod\assetmate\helpers\ContentTablesHelper;
 
+use yii\base\InlineAction;
+use yii\base\InvalidConfigException;
 use yii\console\ExitCode;
 use yii\helpers\BaseConsole;
 
@@ -33,15 +35,22 @@ class PurgeController extends Controller
     /** @var string Set to a valid file kind (e.g. "image" or "video") to only purge unused assets with that kind */
     public string $kind = '*';
 
-    /** @var int|string|bool The minimum amount of time (in seconds) passed since assets' dateUpdated timestamp. Assets updated later than this value will not be purged. Can be set to a valid DateInterval string, or false to disable the dateUpdated check. */
-    public int|string|bool $lastUpdatedBefore = 'P30D';
+    /** @var int|string|bool The minimum amount of time (in seconds) passed since assets' dateUpdated timestamp. Assets updated later than this value will not be purged. Can be set to a valid DateInterval string, or false to disable the dateUpdated check. Defaults to 30 days. */
+    public int|string|bool $lastUpdatedBefore = true;
 
-    /** @var bool Whether to search content tables for non-relation asset uses (e.g. reference tags in rich text fields). Takes a long time if there are a lot of assets and/or content. */
+    /** @var bool Whether to search content tables for the potentially "unused" assets found (e.g. reference tags in rich text fields). Takes a long time if there are a lot of assets and/or content. */
     public bool $searchContentTables = true;
 
-    /** @var bool Whether to automatically purge empty folders after purging unused assets. */
-    public bool $purgeEmptyFolders = true;
+    /** @var int After querying for assets without any source element relations, AssetMate will search for these assets across text columns in content tables. To speed up this lengthy process, the IDs are batched. If you're running into a PDO exception "Timeout exceeded in regular expression match", consider setting this to a lower value. */
+    public int $searchContentTablesBatchSize = 500;
 
+    /** @var bool Whether to scan for and delete empty folders after purging unused assets. */
+    public bool $deleteEmptyFolders = true;
+
+    /**
+     * @param $actionID
+     * @return array|string[]
+     */
     public function options($actionID): array
     {
         $options = parent::options($actionID);
@@ -51,7 +60,8 @@ class PurgeController extends Controller
                 $options[] = 'kind';
                 $options[] = 'lastUpdatedBefore';
                 $options[] = 'searchContentTables';
-                $options[] = 'purgeEmptyFolders';
+                $options[] = 'searchContentTablesBatchSize';
+                $options[] = 'deleteEmptyFolders';
                 break;
             case 'folders':
                 $options[] = 'volume';
@@ -61,9 +71,24 @@ class PurgeController extends Controller
     }
 
     /**
+     * @param $action
+     * @return bool
+     */
+    public function beforeAction($action): bool
+    {
+        if ($action instanceof InlineAction && $action->id === 'assets') {
+            if ($this->lastUpdatedBefore === true) {
+                $this->lastUpdatedBefore = 'P30D';
+            }
+        }
+        return true;
+    }
+
+    /**
      * Purges unused assets. An "unused" asset is an asset that is not the target of any element relations, and is not referenced in content table text columns (e.g. in reference tags etc).
      *
      * assetmate/purge command
+     * @throws InvalidConfigException
      */
     public function actionAssets(): int
     {
@@ -132,7 +157,7 @@ class PurgeController extends Controller
             return ExitCode::OK;
         }
 
-        $this->stdout("Found {$assetsWithoutRelationsCount} assets that aren't targeted in any element relations.\n", BaseConsole::FG_PURPLE);
+        $this->stdout("Found {$assetsWithoutRelationsCount} assets without any source element relations.\n", BaseConsole::FG_PURPLE);
 
         if ($this->searchContentTables) {
 
@@ -147,27 +172,36 @@ class PurgeController extends Controller
                 $this->stdout("Content tables being searched:\n", BaseConsole::FG_YELLOW);
 
                 foreach ($contentTablesToSearch as $table => ['count' => $rowCount]) {
-                    $this->stdout("$table ($rowCount rows):\n", BaseConsole::FG_YELLOW);
+                    $this->stdout("$table ($rowCount rows)\n", BaseConsole::FG_YELLOW);
                 }
 
                 $i = 0;
-                BaseConsole::startProgress(0, $query->count());
+                $totalCount = $query->count();
+                BaseConsole::startProgress(0, $totalCount);
 
-                foreach ($query->batch(500) as $unrelatedAssetsBatch) {
+                $batchSize = $this->searchContentTablesBatchSize;
+                $numBatches = ceil($totalCount / $batchSize);
+                $currentBatch = 0;
+
+                foreach ($query->batch($batchSize) as $unrelatedAssetsBatch) {
+                    $currentBatch++;
                     $assetIds = array_diff(array_column($unrelatedAssetsBatch, 'id'), $contentTableAssetIds);
                     if (empty($assetIds)) {
                         continue;
                     }
-                    $referenceTagPattern = implode('|', array_map(static fn(int $assetId) => "asset:$assetId:url", $assetIds));
+                    $numFound = count($contentTableAssetIds);
+                    $referenceTagPattern = implode('|', array_map(static fn(int $assetId) => "asset:$assetId", $assetIds));
                     $implodedAssetIdsArray = "'" . implode("','", $assetIds) . "'";
                     foreach ($contentTablesToSearch as $table => ['columns' => $columns]) {
+                        $columnsToSearch = array_column($columns, 'column');
+                        BaseConsole::updateProgress($i, $totalCount, "Searching table \"$table\" (ID batch $currentBatch of $numBatches, $numFound references found)... ");
                         $referenceTagsQuery = (new Query())
-                            ->select($columns)
+                            ->select($columnsToSearch)
                             ->from($table);
-                        foreach ($columns as $column) {
+                        foreach ($columnsToSearch as $columnToSearch) {
                             $referenceTagsQuery
-                                ->orWhere(['REGEXP', $column, $referenceTagPattern])
-                                ->orWhere("JSON_VALID($column) AND JSON_EXTRACT($column, '$.type') = :type AND JSON_EXTRACT($column, '$.value') IN (" . $implodedAssetIdsArray . ")", [
+                                ->orWhere(['REGEXP', $columnToSearch, $referenceTagPattern])
+                                ->orWhere("JSON_VALID($columnToSearch) AND JSON_EXTRACT($columnToSearch, '$.type') = :type AND JSON_EXTRACT($columnToSearch, '$.value') IN (" . $implodedAssetIdsArray . ")", [
                                     ':type' => 'asset',
                                 ]);
                         }
@@ -178,20 +212,19 @@ class PurgeController extends Controller
                     }
                     $contentTableAssetIds = array_keys(array_flip($contentTableAssetIds)); // Drop duplicate IDs
                     $i += count($assetIds);
-                    $numFound = count($contentTableAssetIds);
-                    BaseConsole::updateProgress($i, $query->count(), "Searching content tables... ($numFound found) ");
                 }
 
-                BaseConsole::endProgress(true);
+                BaseConsole::endProgress(true, false);
 
                 $time = time() - $then;
                 $this->stdout(PHP_EOL);
                 $this->stdout("Done ({$time}s)! 🎉" . PHP_EOL, BaseConsole::FG_PURPLE);
                 $this->stdout(PHP_EOL);
 
+                $contentTableAssetIds = array_unique(array_values(array_intersect($query->column(), $contentTableAssetIds)));
                 $countReferenceTags = count($contentTableAssetIds);
                 if ($countReferenceTags) {
-                    $this->stdout("Found $countReferenceTags assets referenced in content tables; these will not be purged.\n", BaseConsole::FG_PURPLE);
+                    $this->stdout("Found $countReferenceTags assets referenced in content tables; these will not be purged.\n", BaseConsole::FG_CYAN);
                     $query
                         ->andWhere(['NOT IN', 'assets.id', $contentTableAssetIds]);
                 } else {
@@ -216,68 +249,68 @@ class PurgeController extends Controller
 
         $unusedAssetsCount = $query->count();
 
-        if (!$unusedAssetsCount) {
+        if ($unusedAssetsCount) {
+            $totalFileSize = (clone $query)
+                ->select('SUM(assets.size) AS size')
+                ->scalar();
+            $totalFileSize = Craft::$app->getFormatter()->asShortSize($totalFileSize, 2);
+
+            $this->stdout("Found $unusedAssetsCount assets ($totalFileSize total) that appear to be unused.\n", BaseConsole::FG_PURPLE);
+            $this->stdout(PHP_EOL);
+
+            if ($this->interactive && !$this->confirm("Delete {$unusedAssetsCount} assets? Both the files and their asset records will permanently deleted 🔥" . PHP_EOL)) {
+                $this->stdout(PHP_EOL);
+                $this->stdout("OK, no harm done!\n", BaseConsole::FG_YELLOW);
+
+            } else {
+                $this->stdout(PHP_EOL);
+
+                $then = time();
+
+                $i = 0;
+                BaseConsole::startProgress(0, $unusedAssetsCount, 'Deleting assets... ');
+
+                $numDeleted = 0;
+                $numErrors = 0;
+                foreach ($query->each() as ['id' => $assetId]) {
+                    try {
+                        if (!$this->_deleteAsset($assetId)) {
+                            throw new \Exception("Unable to delete asset ID {$assetId}");
+                        }
+                        $numDeleted++;
+                    } catch (\Throwable $e) {
+                        Craft::error($e, __METHOD__);
+                        $this->stderr($e->getMessage() . PHP_EOL, BaseConsole::FG_RED);
+                        $numErrors++;
+                    }
+                    $i++;
+                    BaseConsole::updateProgress($i, $unusedAssetsCount, 'Deleting assets...');
+                }
+
+                BaseConsole::endProgress(true);
+
+                $time = time() - $then;
+                $this->stdout("Done ({$time}s)! 🎉" . PHP_EOL, BaseConsole::FG_PURPLE);
+                $this->stdout(PHP_EOL);
+                $this->stdout("$numDeleted of $unusedAssetsCount assets were deleted.\n", BaseConsole::FG_PURPLE);
+                $this->stdout("There were $numErrors errors.\n", BaseConsole::FG_PURPLE);
+
+            }
+        } else {
             $this->stdout("No unused assets found.\n", BaseConsole::FG_PURPLE);
-            return ExitCode::OK;
         }
 
-        $totalFileSize = (clone $query)
-            ->select('SUM(assets.size) AS size')
-            ->scalar();
-        $totalFileSize = Craft::$app->getFormatter()->asShortSize($totalFileSize, 2);
-
-        $this->stdout("Found $unusedAssetsCount assets ($totalFileSize total) that appear to be unused.\n", BaseConsole::FG_PURPLE);
         $this->stdout(PHP_EOL);
 
-        if ($this->interactive && !$this->confirm("Delete {$unusedAssetsCount} assets? Both the files and their asset records will permanently deleted 🔥" . PHP_EOL)) {
+        // Purge empty folders?
+        if ($this->deleteEmptyFolders && (!$this->interactive || $this->confirm("Do you want to scan for and delete empty folders?", true))) {
             $this->stdout(PHP_EOL);
-            $this->stdout("OK, no harm done!\n", BaseConsole::FG_YELLOW);
-
-        } else {
-            $this->stdout(PHP_EOL);
-
-            $then = time();
-
-            $i = 0;
-            BaseConsole::startProgress(0, $unusedAssetsCount, 'Deleting assets... ');
-
-            $numDeleted = 0;
-            $numErrors = 0;
-            foreach ($query->each() as ['id' => $assetId]) {
-                try {
-                    if (!$this->_deleteAsset($assetId)) {
-                        throw new \Exception("Unable to delete asset ID {$assetId}");
-                    }
-                    $numDeleted++;
-                } catch (\Throwable $e) {
-                    Craft::error($e, __METHOD__);
-                    $this->stderr($e->getMessage() . PHP_EOL, BaseConsole::FG_RED);
-                    $numErrors++;
-                }
-                $i++;
-                BaseConsole::updateProgress($i, $unusedAssetsCount, 'Deleting assets...');
+            $this->stdout("Searching for empty folders to purge...\n", BaseConsole::FG_YELLOW);
+            if ($this->actionFolders() === ExitCode::OK) {
+                $this->stdout("Done! 🎉" . PHP_EOL, BaseConsole::FG_PURPLE);
+            } else {
+                $this->stderr("Failed to purge empty folders\n", BaseConsole::FG_RED);
             }
-
-            BaseConsole::endProgress(true);
-
-            $time = time() - $then;
-            $this->stdout("Done ({$time}s)! 🎉" . PHP_EOL, BaseConsole::FG_PURPLE);
-            $this->stdout(PHP_EOL);
-            $this->stdout("$numDeleted of $unusedAssetsCount assets were deleted.\n", BaseConsole::FG_PURPLE);
-            $this->stdout("There were $numErrors errors.\n", BaseConsole::FG_PURPLE);
-
-            // Purge empty folders?
-            if ($this->purgeEmptyFolders) {
-                $this->stdout(PHP_EOL);
-                $this->stdout("Searching for empty folders to purge...\n", BaseConsole::FG_YELLOW);
-                $this->interactive = false;
-                if ($this->actionFolders() === ExitCode::OK) {
-                    $this->stdout("Done! 🎉" . PHP_EOL, BaseConsole::FG_PURPLE);
-                } else {
-                    $this->stderr("Failed to purge empty folders\n", BaseConsole::FG_RED);
-                }
-            }
-
         }
 
         return ExitCode::OK;
@@ -385,6 +418,10 @@ class PurgeController extends Controller
         return ExitCode::OK;
     }
 
+    /**
+     * @param array $rows
+     * @return array
+     */
     private function _getAssetIdsFromContentTableRows(array $rows): array
     {
         $assetIds = [];
@@ -402,7 +439,7 @@ class PurgeController extends Controller
                     }
                 } else {
                     // Get asset IDs from reference tags
-                    preg_match_all('/{asset:(\d+):/', implode('', array_filter(array_values($row))), $referenceTagMatches);
+                    preg_match_all('/asset:(\d+)/', implode('', array_filter(array_values($row))), $referenceTagMatches);
                     $assetIds = [...$assetIds, ...array_filter(array_map('intval', $referenceTagMatches[1] ?? []))];
                 }
             }

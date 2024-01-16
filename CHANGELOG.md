@@ -1,5 +1,20 @@
 # AssetMate Changelog
 
+## 2.4.1 - 2024-01-16
+### Added
+- Added the `--searchContentTablesBatchSize` option to the `assetmate/purge` CLI command
+### Changed
+- AssetMate no longer searches *every* textual column across all content tables when purging unused assets; only HTML fields (Redactor/CK Editor) and LinkMate are searched.
+- After purging unused assets, the `assetmate/purge` CLI command will now prompt the user for confirmation before scanning for and deleting empty folders
+### Improved
+- Improved performance when purging unused assets via the `assetmate/purge` CLI command
+- The `assetmate/purge` CLI command will now throw an exception if a field type being searched in content tables is missing its class. This prevents skipping over content table text columns that could contain references to "unused" assets.  
+### Fixed
+- Fixed a PDO exception that could occur when hitting the `regexp_time_limit` setting on MySQL 8, when doing regex matching on content table text columns when purging unused assets  
+- Fixed a PDO exception that could occur when doing regex matching on content table text columns when purging unused assets  
+- Fixed a PHP exception that could occur if the `--lastUpdatedBefore` option for the `assetmate/purge` command was set to `true`  
+- Fixed an issue where the `assetmate/purge` CLI command would purge assets in reference tags if the reference tag contained a site ID (i.e. `@1` or similar)  
+
 ## 2.4.0 - 2024-01-15
 ### Added
 - Added the `assetmate/purge` CLI command for bulk-deleting unused assets
