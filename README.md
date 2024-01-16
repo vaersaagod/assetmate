@@ -98,7 +98,7 @@ By default, AssetMate will not purge assets with a `dateUpdated` timestamp later
 ##### `--searchContentTables` (bool, default `true`)  
 In addition to checking the `relations` table for assets without any source element relations, AssetMate will search content tables to make sure that the assets found aren't referenced in text columns (e.g. in reference tags in Redactor or CK Editor). This can take a long time if there are a lot of assets and/or content, so if you're confident that you have no asset references in text fields, set this option to `false` to bypass content table searching altogether.  
 
-#### `--searchContentTablesBatchSize` (int, default `500`)  
+##### `--searchContentTablesBatchSize` (int, default `500`)  
 After querying for assets without any source element relations, AssetMate will search for these assets across text columns in content tables. To speed up this lengthy process, the IDs are batched. If you're running into a PDO exception "Timeout exceeded in regular expression match", consider setting the batch size to a lower value.  
 
 ##### `--deleteEmptyFolders` (bool, default `true`)  
