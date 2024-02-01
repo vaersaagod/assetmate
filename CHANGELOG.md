@@ -1,5 +1,10 @@
 # AssetMate Changelog
 
+## 1.2.2 - 2024-02-01
+
+### Fixed
+- Fixed a PHP exception that would be thrown when uploading files to the temporary uploads folder
+
 ## 1.2.1 - 2023-06-01
 
 ### Added
