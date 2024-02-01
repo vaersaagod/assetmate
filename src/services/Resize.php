@@ -52,7 +52,6 @@ class Resize extends Component
 
     public function resize(Asset $asset, ResizeSettings $config): void
     {
-        $filename = $asset->filename;
         $path = $asset->tempFilePath;
 
         // Is this a manipulatable image?
@@ -62,12 +61,6 @@ class Resize extends Component
 
         try {
             $image = \Craft::$app->images->loadImage($path);
-
-            $original = [
-                'width' => $image->getWidth(),
-                'height' => $image->getHeight(),
-                'size' => filesize($path),
-            ];
 
             if (
                 (isset($config->maxWidth) && !isset($config->maxHeight) && $image->getWidth() < $config->maxWidth) ||
