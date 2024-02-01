@@ -6,10 +6,12 @@ use Craft;
 use craft\base\Component;
 use craft\elements\Asset;
 use craft\helpers\ConfigHelper;
+
 use vaersaagod\assetmate\AssetMate;
 use vaersaagod\assetmate\models\Settings;
 use vaersaagod\assetmate\models\ValidationSettings;
 use vaersaagod\assetmate\models\VolumeSettings;
+
 use yii\base\InvalidConfigException;
 
 /**
@@ -26,6 +28,10 @@ class Validate extends Component
         try {
             $volume = $asset->getVolume()->handle;
         } catch (InvalidConfigException $e) {
+            return;
+        }
+
+        if (empty($volume)) {
             return;
         }
 

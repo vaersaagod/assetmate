@@ -4,13 +4,12 @@ namespace vaersaagod\assetmate\services;
 
 use craft\base\Component;
 use craft\elements\Asset;
-use craft\errors\ImageException;
 use craft\helpers\Image;
-use craft\image\Raster;
+
 use vaersaagod\assetmate\AssetMate;
-use vaersaagod\assetmate\models\ResizeSettings;
 use vaersaagod\assetmate\models\Settings;
 use vaersaagod\assetmate\models\VolumeSettings;
+
 use yii\base\InvalidConfigException;
 
 /**
@@ -33,6 +32,10 @@ class Convert extends Component
         try {
             $volume = $asset->getVolume()->handle;
         } catch (InvalidConfigException) {
+            return;
+        }
+
+        if (empty($volume)) {
             return;
         }
 
