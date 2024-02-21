@@ -7,7 +7,7 @@ Protect your assets, mate!
 
 ## Requirements
 
-This plugin requires Craft CMS 4.0.0+ and PHP 8.0+. 
+This plugin requires Craft CMS 5.0.0+ and PHP 8.2+. 
 
 ## Installation
 
