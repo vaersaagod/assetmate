@@ -43,6 +43,13 @@ return [
                 'size' => [
                     'max' => '2M',
                 ],
+                'dimensions' => [
+                    'maxWidth' => 2200, 
+                    'maxHeight' => 2200 
+                    'minWidth' => 200, 
+                    'minHeight' => 200 
+                ],
+                'autoValidateResizeDimensions' => true
             ],
             'resize' => [
                 'maxWidth' => 2200,
@@ -57,7 +64,7 @@ return [
                 'size' => [
                     'max' => '1M',
                     'min' => '50K',
-                ],
+                ]
             ]
         ],        
         'videos' => [
