@@ -43,6 +43,15 @@ return [
                 'size' => [
                     'max' => '2M',
                 ],
+                'dimensions' => [
+                    'maxWidth' => 2200, 
+                    'maxHeight' => 2200 
+                    'minWidth' => 200, 
+                    'minHeight' => 200 
+                ],
+                // This makes maxWidth and maxHeight redundant in `dimensions` (and is the default),
+                // just added it for reference.  
+                'autoValidateResizeDimensions' => true 
             ],
             'resize' => [
                 'maxWidth' => 2200,

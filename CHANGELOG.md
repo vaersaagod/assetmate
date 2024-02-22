@@ -1,5 +1,9 @@
 # AssetMate Changelog
 
+## 2.5.0 - 2024-02-22
+### Added
+- Added support for validating image dimensions
+
 ## 2.4.1 - 2024-01-16
 ### Added
 - Added the `--searchContentTablesBatchSize` option to the `assetmate/purge` CLI command
