@@ -5,7 +5,6 @@ namespace vaersaagod\assetmate\services;
 use craft\base\Component;
 use craft\elements\Asset;
 use craft\errors\ImageException;
-use craft\errors\VolumeException;
 use craft\helpers\Image;
 use craft\models\Volume;
 
@@ -14,8 +13,6 @@ use vaersaagod\assetmate\helpers\AssetMateHelper;
 use vaersaagod\assetmate\models\ResizeSettings;
 use vaersaagod\assetmate\models\Settings;
 use vaersaagod\assetmate\models\VolumeSettings;
-
-use yii\base\InvalidConfigException;
 
 /**
  * Resize Service
@@ -40,31 +37,15 @@ class Resize extends Component
             return;
         }
 
-        $config = $this->getResizeConfig($volume);
+        $config = self::getResizeConfig($volume);
 
         if (!isset($config->maxWidth, $config->maxWidth)) {
             return;
         }
 
-        $path = $asset->tempFilePath;
+        $path = AssetMateHelper::getAssetPath($asset);
 
-        // In case the asset is being moved, there won't be a `tempFilePath` to (maybe) resize
-        // We work around this by pulling a copy of the file to a local, temporary file path
-        // We only do this if the asset is actually moved to a new volume, though.
-        if (
-            !$path &&
-            ($asset->getScenario() === Asset::SCENARIO_MOVE || $asset->getScenario() === Asset::SCENARIO_FILEOPS) &&
-            $volume->id !== $asset->volumeId
-        ) {
-            try {
-                $path = $asset->getCopyOfFile();
-                $asset->tempFilePath = $path;
-            } catch (VolumeException|InvalidConfigException) {
-                return;
-            }
-        }
-
-        if (!$path) {
+        if (empty($path)) {
             return;
         }
 
@@ -78,7 +59,6 @@ class Resize extends Component
      */
     public function resize(Asset $asset, ResizeSettings $config): void
     {
-
         $path = $asset->tempFilePath;
 
         // Is this a manipulatable image?
@@ -176,7 +156,7 @@ class Resize extends Component
      * @param string|Volume $volume Volume model or handle
      * @return ResizeSettings
      */
-    public function getResizeConfig(string|Volume $volume): ResizeSettings
+    public static function getResizeConfig(string|Volume $volume): ResizeSettings
     {
 
         if ($volume instanceof Volume) {
@@ -191,7 +171,7 @@ class Resize extends Component
         $volumeConfig = new VolumeSettings($volumes[$volume] ?? []);
 
         $r = array_merge($defaultConfig->resize, $volumeConfig->resize);
-
+        
         return new ResizeSettings($r);
     }
 
