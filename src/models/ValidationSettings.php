@@ -14,6 +14,8 @@ class ValidationSettings extends Model
     public array $kinds = [];
     public array $extensions = [];
     public ?ValidationSize $size = null;
+    public ?ValidationDimensions $dimensions = null;
+    public bool $autoValidateResizeDimensions = true;
 
     // Public Methods
     // =========================================================================
@@ -27,6 +29,10 @@ class ValidationSettings extends Model
     {
         if (isset($config['size'])) {
             $config['size'] = new ValidationSize($config['size']);
+        }
+        
+        if (isset($config['dimensions'])) {
+            $config['dimensions'] = new ValidationDimensions($config['dimensions']);
         }
         
         parent::__construct($config);

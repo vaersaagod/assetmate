@@ -3,6 +3,7 @@
 namespace vaersaagod\assetmate\helpers;
 
 use craft\elements\Asset;
+use craft\errors\VolumeException;
 use craft\fields\Assets as AssetsField;
 use craft\fs\Temp;
 use craft\helpers\Assets;
@@ -55,4 +56,27 @@ class AssetMateHelper
         return $volume;
     }
 
+    public static function getAssetPath(Asset $asset): ?string
+    {
+        $volume = self::getAssetVolume($asset);
+        $path = $asset->tempFilePath;
+
+        // In case the asset is being moved, there won't be a `tempFilePath` to (maybe) resize
+        // We work around this by pulling a copy of the file to a local, temporary file path
+        // We only do this if the asset is actually moved to a new volume, though.
+        if (
+            !$path &&
+            $volume?->id !== $asset->volumeId &&
+            ($asset->getScenario() === Asset::SCENARIO_MOVE || $asset->getScenario() === Asset::SCENARIO_FILEOPS)
+        ) {
+            try {
+                $path = $asset->getCopyOfFile();
+                $asset->tempFilePath = $path;
+            } catch (VolumeException|InvalidConfigException) {
+                return null;
+            }
+        }
+        
+        return $path;
+    }
 }
