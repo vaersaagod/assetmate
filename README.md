@@ -45,9 +45,9 @@ return [
                 ],
                 'dimensions' => [
                     'maxWidth' => 2200, 
-                    'maxHeight' => 2200 
+                    'maxHeight' => 2200,
                     'minWidth' => 200, 
-                    'minHeight' => 200 
+                    'minHeight' => 200,
                 ],
                 // This makes maxWidth and maxHeight redundant in `dimensions` (and is the default),
                 // just added it for reference.  
