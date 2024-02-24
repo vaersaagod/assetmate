@@ -1,5 +1,11 @@
 # AssetMate Changelog
 
+## 2.6.0 - 2024-02-24
+### Changed
+- The `assetmate/purge/assets` controller now deletes unused, soft-deleted assets as well
+- The `assetmate/purge/folders` controller no longer cares about soft-deleted assets
+- The prompt to purge empty folders after purging empty assets no longer defaults to Yes
+
 ## 2.5.0 - 2024-02-22
 ### Added
 - Added support for validating image dimensions
