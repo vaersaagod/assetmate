@@ -1,5 +1,9 @@
 # AssetMate Changelog
 
+## 2.6.0.1 - 2024-02-24
+### Fixed
+- Fixed regression error due to soft-deleted assets not being possible to delete via `Elements::deleteElementById()`  
+
 ## 2.6.0 - 2024-02-24
 ### Changed
 - The `assetmate/purge/assets` controller now deletes unused, soft-deleted assets as well

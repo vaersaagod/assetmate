@@ -98,6 +98,7 @@ class PurgeController extends Controller
         $query = (new Query())
             ->select('assets.id')
             ->from(Table::ASSETS . ' AS assets')
+            ->innerJoin(Table::ELEMENTS . ' AS elements', 'assets.id = elements.id AND elements.dateDeleted IS NULL') // Excluding assets that are soft-deleted
             ->where(['NOT EXISTS', (new Query())
                 ->from(Table::USERS . ' AS users')
                 ->where('assets.id = users.photoId')
