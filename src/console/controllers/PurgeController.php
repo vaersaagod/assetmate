@@ -98,7 +98,6 @@ class PurgeController extends Controller
         $query = (new Query())
             ->select('assets.id')
             ->from(Table::ASSETS . ' AS assets')
-            ->innerJoin(Table::ELEMENTS . ' AS elements', 'assets.id = elements.id AND elements.dateDeleted IS NULL') // Excluding assets that are already soft-deleted
             ->where(['NOT EXISTS', (new Query())
                 ->from(Table::USERS . ' AS users')
                 ->where('assets.id = users.photoId')
@@ -151,11 +150,6 @@ class PurgeController extends Controller
             ]);
 
         $assetsWithoutRelationsCount = $query->count();
-
-        if (!$assetsWithoutRelationsCount) {
-            $this->stdout("No unused assets found 🎉" . PHP_EOL, BaseConsole::FG_PURPLE);
-            return ExitCode::OK;
-        }
 
         $this->stdout("Found {$assetsWithoutRelationsCount} assets without any source element relations.\n", BaseConsole::FG_PURPLE);
 
@@ -303,7 +297,7 @@ class PurgeController extends Controller
         $this->stdout(PHP_EOL);
 
         // Purge empty folders?
-        if ($this->deleteEmptyFolders && (!$this->interactive || $this->confirm("Do you want to scan for and delete empty folders?", true))) {
+        if ($this->deleteEmptyFolders && (!$this->interactive || $this->confirm("Do you want to scan for and delete empty folders?"))) {
             $this->stdout(PHP_EOL);
             $this->stdout("Searching for empty folders to purge...\n", BaseConsole::FG_YELLOW);
             if ($this->actionFolders() === ExitCode::OK) {
@@ -347,6 +341,7 @@ class PurgeController extends Controller
         $query
             ->andWhere(['NOT EXISTS', (new Query())
                 ->from(Table::ASSETS . ' AS assets')
+                ->innerJoin(Table::ELEMENTS . ' AS elements', 'assets.id = elements.id AND elements.dateDeleted IS NULL') // Excluding assets that are soft-deleted
                 ->where('folders.id = assets.folderId')
             ]);
 
