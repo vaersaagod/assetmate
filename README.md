@@ -45,11 +45,11 @@ return [
                 ],
                 'dimensions' => [
                     'maxWidth' => 2200, 
-                    'maxHeight' => 2200 
+                    'maxHeight' => 2200,
                     'minWidth' => 200, 
-                    'minHeight' => 200 
+                    'minHeight' => 200,
                 ],
-                'autoValidateResizeDimensions' => true
+                'autoValidateResizeDimensions' => true,
             ],
             'resize' => [
                 'maxWidth' => 2200,

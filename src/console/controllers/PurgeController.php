@@ -7,13 +7,12 @@ use craft\console\Controller;
 use craft\db\Query;
 use craft\db\Table;
 use craft\elements\Asset;
+use craft\helpers\ArrayHelper;
 use craft\helpers\Assets;
 use craft\helpers\ConfigHelper;
 use craft\helpers\Db;
 use craft\helpers\Json;
 use craft\models\Volume;
-
-use vaersaagod\assetmate\helpers\ContentTablesHelper;
 
 use yii\base\InlineAction;
 use yii\base\InvalidConfigException;
@@ -98,7 +97,7 @@ class PurgeController extends Controller
         $query = (new Query())
             ->select('assets.id')
             ->from(Table::ASSETS . ' AS assets')
-            ->innerJoin(Table::ELEMENTS . ' AS elements', 'assets.id = elements.id AND elements.dateDeleted IS NULL') // Excluding assets that are already soft-deleted
+            ->innerJoin(Table::ELEMENTS . ' AS elements', 'assets.id = elements.id AND elements.dateDeleted IS NULL') // Excluding assets that are soft-deleted
             ->where(['NOT EXISTS', (new Query())
                 ->from(Table::USERS . ' AS users')
                 ->where('assets.id = users.photoId')
@@ -152,90 +151,75 @@ class PurgeController extends Controller
 
         $assetsWithoutRelationsCount = $query->count();
 
-        if (!$assetsWithoutRelationsCount) {
-            $this->stdout("No unused assets found 🎉" . PHP_EOL, BaseConsole::FG_PURPLE);
-            return ExitCode::OK;
-        }
-
         $this->stdout("Found {$assetsWithoutRelationsCount} assets without any source element relations.\n", BaseConsole::FG_PURPLE);
 
         if ($this->searchContentTables) {
 
+            $contentTableName = Table::ELEMENTS_SITES;
+            $numContentRows = (new Query())
+                ->from($contentTableName)
+                ->count();
+
             $this->stdout(PHP_EOL);
-            $this->stdout("Searching for asset references in content tables... 🔍" . PHP_EOL, BaseConsole::FG_YELLOW);
+            $this->stdout("Searching the \"$contentTableName\" content table ($numContentRows total rows) for asset references... 🔍" . PHP_EOL, BaseConsole::FG_YELLOW);
 
             $contentTableAssetIds = [];
-            $contentTablesToSearch = ContentTablesHelper::getTextColumnsByTable();
 
-            if (!empty(array_keys($contentTablesToSearch))) {
+            $i = 0;
+            $totalCount = $query->count();
+            BaseConsole::startProgress(0, $totalCount);
 
-                $this->stdout("Content tables being searched:\n", BaseConsole::FG_YELLOW);
+            $batchSize = $this->searchContentTablesBatchSize;
+            $numBatches = ceil($totalCount / $batchSize);
+            $currentBatch = 0;
 
-                foreach ($contentTablesToSearch as $table => ['count' => $rowCount]) {
-                    $this->stdout("$table ($rowCount rows)\n", BaseConsole::FG_YELLOW);
+            foreach ($query->batch($batchSize) as $unrelatedAssetsBatch) {
+                $currentBatch++;
+                $assetIds = array_diff(array_column($unrelatedAssetsBatch, 'id'), $contentTableAssetIds);
+
+                if (empty($assetIds)) {
+                    continue;
                 }
 
-                $i = 0;
-                $totalCount = $query->count();
-                BaseConsole::startProgress(0, $totalCount);
+                $numFound = count($contentTableAssetIds);
 
-                $batchSize = $this->searchContentTablesBatchSize;
-                $numBatches = ceil($totalCount / $batchSize);
-                $currentBatch = 0;
+                BaseConsole::updateProgress($i, $totalCount, "Searching content table (ID batch $currentBatch of $numBatches, $numFound references found)... ");
 
-                foreach ($query->batch($batchSize) as $unrelatedAssetsBatch) {
-                    $currentBatch++;
-                    $assetIds = array_diff(array_column($unrelatedAssetsBatch, 'id'), $contentTableAssetIds);
-                    if (empty($assetIds)) {
-                        continue;
-                    }
-                    $numFound = count($contentTableAssetIds);
-                    $referenceTagPattern = implode('|', array_map(static fn(int $assetId) => "asset:$assetId", $assetIds));
-                    $implodedAssetIdsArray = "'" . implode("','", $assetIds) . "'";
-                    foreach ($contentTablesToSearch as $table => ['columns' => $columns]) {
-                        $columnsToSearch = array_column($columns, 'column');
-                        BaseConsole::updateProgress($i, $totalCount, "Searching table \"$table\" (ID batch $currentBatch of $numBatches, $numFound references found)... ");
-                        $referenceTagsQuery = (new Query())
-                            ->select($columnsToSearch)
-                            ->from($table);
-                        foreach ($columnsToSearch as $columnToSearch) {
-                            $referenceTagsQuery
-                                ->orWhere(['REGEXP', $columnToSearch, $referenceTagPattern])
-                                ->orWhere("JSON_VALID($columnToSearch) AND JSON_EXTRACT($columnToSearch, '$.type') = :type AND JSON_EXTRACT($columnToSearch, '$.value') IN (" . $implodedAssetIdsArray . ")", [
-                                    ':type' => 'asset',
-                                ]);
-                        }
-                        $contentTableAssetIds = [
-                            ...$contentTableAssetIds,
-                            ...$this->_getAssetIdsFromContentTableRows($referenceTagsQuery->all()),
-                        ];
-                    }
-                    $contentTableAssetIds = array_keys(array_flip($contentTableAssetIds)); // Drop duplicate IDs
-                    $i += count($assetIds);
-                }
+                $referenceTagPattern = implode('|', array_map(static fn(int $assetId) => "asset:$assetId", $assetIds));
+                $linkMateValuePattern = implode('|', array_map(static fn(int $assetId) => "\"value\": \"$assetId\"", $assetIds));
 
-                BaseConsole::endProgress(true, false);
+                $contentTableRowsQuery = (new Query())
+                    ->select('content')
+                    ->from($contentTableName)
+                    ->orWhere(['REGEXP', 'content', $referenceTagPattern])
+                    ->orWhere(['REGEXP', 'content', $linkMateValuePattern])
+                    ->distinct('column');
 
-                $time = time() - $then;
-                $this->stdout(PHP_EOL);
-                $this->stdout("Done ({$time}s)! 🎉" . PHP_EOL, BaseConsole::FG_PURPLE);
-                $this->stdout(PHP_EOL);
+                $contentTableAssetIds = [
+                    ...$contentTableAssetIds,
+                    ...$this->_getAssetIdsFromContentTableRows($contentTableRowsQuery->column()),
+                ];
 
-                $contentTableAssetIds = array_unique(array_values(array_intersect($query->column(), $contentTableAssetIds)));
-                $countReferenceTags = count($contentTableAssetIds);
-                if ($countReferenceTags) {
-                    $this->stdout("Found $countReferenceTags assets referenced in content tables; these will not be purged.\n", BaseConsole::FG_CYAN);
-                    $query
-                        ->andWhere(['NOT IN', 'assets.id', $contentTableAssetIds]);
-                } else {
-                    $this->stdout("No referenced assets found in content tables.\n", BaseConsole::FG_PURPLE);
-                }
+                $contentTableAssetIds = array_keys(array_flip($contentTableAssetIds)); // Drop duplicate IDs
 
+                $i += count($assetIds);
+            }
+
+            BaseConsole::endProgress(true, false);
+
+            $time = time() - $then;
+            $this->stdout(PHP_EOL);
+            $this->stdout("Done ({$time}s)! 🎉" . PHP_EOL, BaseConsole::FG_PURPLE);
+            $this->stdout(PHP_EOL);
+
+            $contentTableAssetIds = array_unique(array_values(array_intersect($query->column(), $contentTableAssetIds)));
+            $contentTableAssetIdsCount = count($contentTableAssetIds);
+            if ($contentTableAssetIdsCount) {
+                $this->stdout("$contentTableAssetIdsCount of $totalCount unused assets are referenced in the content table; these will not be purged.\n", BaseConsole::FG_CYAN);
+                $query
+                    ->andWhere(['NOT IN', 'assets.id', $contentTableAssetIds]);
             } else {
-
-                $this->stdout(PHP_EOL);
-                $this->stdout("There are no content tables to search.\n", BaseConsole::FG_PURPLE);
-
+                $this->stdout("No unused assets found referenced in content tables.\n", BaseConsole::FG_PURPLE);
             }
 
         } else {
@@ -303,7 +287,7 @@ class PurgeController extends Controller
         $this->stdout(PHP_EOL);
 
         // Purge empty folders?
-        if ($this->deleteEmptyFolders && (!$this->interactive || $this->confirm("Do you want to scan for and delete empty folders?", true))) {
+        if ($this->deleteEmptyFolders && (!$this->interactive || $this->confirm("Do you want to scan for and delete empty folders?"))) {
             $this->stdout(PHP_EOL);
             $this->stdout("Searching for empty folders to purge...\n", BaseConsole::FG_YELLOW);
             if ($this->actionFolders() === ExitCode::OK) {
@@ -347,6 +331,7 @@ class PurgeController extends Controller
         $query
             ->andWhere(['NOT EXISTS', (new Query())
                 ->from(Table::ASSETS . ' AS assets')
+                ->innerJoin(Table::ELEMENTS . ' AS elements', 'assets.id = elements.id AND elements.dateDeleted IS NULL') // Excluding assets that are soft-deleted
                 ->where('folders.id = assets.folderId')
             ]);
 
@@ -426,21 +411,20 @@ class PurgeController extends Controller
     {
         $assetIds = [];
         foreach ($rows as $row) {
-            $columns = array_filter(array_values($row));
-            foreach ($columns as $column) {
-                if (!is_string($column)) {
-                    continue;
-                }
-                if (Json::isJsonObject($column)) {
-                    // Assume LinkMate field
-                    $json = Json::decode($column);
-                    if (($json['type'] ?? null) === 'asset' && $assetId = (int)($json['value'] ?? null)) {
+            if (!is_string($row) || !Json::isJsonObject($row)) {
+                continue;
+            }
+            $fieldValues = array_values(Json::decode($row));
+            foreach ($fieldValues as $fieldValue) {
+                if (is_string($fieldValue)) {
+                    // Get asset IDs from reference tags
+                    preg_match_all('/asset:(\d+)/', $row, $referenceTagMatches);
+                    $assetIds = [...$assetIds, ...array_filter(array_map('intval', $referenceTagMatches[1] ?? []))];
+                } else if (ArrayHelper::isAssociative($fieldValue)) {
+                    // Could be a LinkMate field
+                    if (($fieldValue['type'] ?? null) === 'asset' && $assetId = (int)($fieldValue['value'] ?? null)) {
                         $assetIds[] = $assetId;
                     }
-                } else {
-                    // Get asset IDs from reference tags
-                    preg_match_all('/asset:(\d+)/', implode('', array_filter(array_values($row))), $referenceTagMatches);
-                    $assetIds = [...$assetIds, ...array_filter(array_map('intval', $referenceTagMatches[1] ?? []))];
                 }
             }
         }
@@ -464,7 +448,7 @@ class PurgeController extends Controller
     private function _getVolumeFromHandle(string $handle): ?Volume
     {
         if (!$volume = Craft::$app->getVolumes()->getVolumeByHandle($handle)) {
-            $allVolumes = array_map(static fn (Volume $volume) => $volume->handle, Craft::$app->getVolumes()->getAllVolumes());
+            $allVolumes = array_map(static fn(Volume $volume) => $volume->handle, Craft::$app->getVolumes()->getAllVolumes());
             $this->stderr("Volume \"$handle\" does not exist. Valid volumes are \n" . implode("\n", $allVolumes) . PHP_EOL, BaseConsole::FG_RED);
             return null;
         }
