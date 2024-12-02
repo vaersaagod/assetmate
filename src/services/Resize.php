@@ -106,6 +106,8 @@ class Resize extends Component
         } catch (\Throwable $throwable) {
             \Craft::error('An error occured when trying to resize Asset: '.$throwable->getMessage(), __METHOD__);
         }
+        
+        clearstatcache(true, $path);
     }
 
     /**
