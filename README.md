@@ -7,7 +7,7 @@ Protect your assets, mate!
 
 ## Requirements
 
-This plugin requires Craft CMS 4.0.0+ and PHP 8.0+. 
+This plugin requires Craft CMS 5.0.0+ and PHP 8.2+. 
 
 ## Installation
 
@@ -49,9 +49,7 @@ return [
                     'minWidth' => 200, 
                     'minHeight' => 200,
                 ],
-                // This makes maxWidth and maxHeight redundant in `dimensions` (and is the default),
-                // just added it for reference.  
-                'autoValidateResizeDimensions' => true 
+                'autoValidateResizeDimensions' => true,
             ],
             'resize' => [
                 'maxWidth' => 2200,
@@ -66,7 +64,7 @@ return [
                 'size' => [
                     'max' => '1M',
                     'min' => '50K',
-                ],
+                ]
             ]
         ],        
         'videos' => [
