@@ -1,5 +1,9 @@
 # AssetMate Changelog
 
+## 3.0.1 - 2025-02-26
+### Fixed
+- Fixed an issue where assets couldn’t be saved if the file didn’t validate.
+
 ## 3.0.0 - 2024-12-02
 ### Fixed
 - Fixed an issue where old file stats could be used when validating resized images
