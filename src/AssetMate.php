@@ -76,7 +76,10 @@ class AssetMate extends Plugin
             function (ModelEvent $event) {
                 /** @var Asset $asset */
                 $asset = $event->sender;
-                if (!$asset->propagating) {
+                if (
+                    !$asset->propagating
+                    && in_array($asset->scenario, [Asset::SCENARIO_CREATE, Asset::SCENARIO_REPLACE, Asset::SCENARIO_MOVE], true) 
+                ) {
                     $this->validate->validateAsset($asset);
                 }
             }
